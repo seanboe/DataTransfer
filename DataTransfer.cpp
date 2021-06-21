@@ -1,47 +1,28 @@
 #include "DataTransfer.h"
 
 
-Transfer::Transfer(RH_RF69 *rf69, int byteCount, uint8_t * key)  {
+Transfer::Transfer(int CE, int CSN, int byteCount) : radio(CE, CSN)  {
 
   _byteCount = byteCount;
-
-  _rf69 = rf69;
 
   _dataArray = (byte *) malloc(_byteCount);
   for (int x = 0; x < _byteCount; x++)
     _dataArray[x] = 0;
 
-  _key = key;
-
 };
 
-bool Transfer::init() {
-  pinMode(RFM69_RST, OUTPUT);
-  digitalWrite(RFM69_RST, LOW);
-
-  //Manual radio reset
-  digitalWrite(RFM69_RST, HIGH);
-  delay(10);
-  digitalWrite(RFM69_RST, LOW);
-  delay(10);
-
-  if (Serial) 
-    Serial.println("LoRA radio reset complete!");
-
-  if (!_rf69->init()) {
-    if (Serial)
-      Serial.println("RFM69 radio initialization failed");
-    return false;
+bool Transfer::init(uint8_t pipe, CommunicatorType communicatorType, const uint8_t* radioAddress) {
+  if (!radio.begin()) return false;
+  radio.setChannel(CHANNEL);
+  switch (communicatorType) {
+    case RECEIVER:    radio.openReadingPipe(pipe, radioAddress); break;
+    case TRANSMITTER: radio.openWritingPipe(radioAddress); break;
   }
-
-  if (!_rf69->setFrequency(RF69_FREQ)) {
-    if (Serial)
-      Serial.println("setFrequency failed");
+  radio.setPALevel(RF24_PA_MIN);
+  switch (communicatorType) {
+    case RECEIVER:    radio.startListening(); break;
+    case TRANSMITTER: radio.stopListening(); break;
   }
-
-  _rf69->setTxPower(20);
-  _rf69->setEncryptionKey(_key);
-
   return true;
 };
 
@@ -84,8 +65,8 @@ byte Transfer::read(BIT_OR_BYTE bitOrByte, int index) {
 };
 
 void Transfer::send(bool resetBuffer) {
-  _rf69->send(_dataArray, _byteCount);
-  _rf69->waitPacketSent();
+  // uint8_t dataArray[5] = {0,1,2,3,4};
+  radio.write(_dataArray, _byteCount);      // possibly incorrect
 
   if (resetBuffer) {
     for (int x = 0; x < _byteCount; x++) 
@@ -94,18 +75,8 @@ void Transfer::send(bool resetBuffer) {
 };
 
 bool Transfer::receive() {
-  if (_rf69->available()) {
-    uint8_t dataBuffer[RH_RF69_MAX_MESSAGE_LEN];
-    uint8_t len = sizeof(dataBuffer);
-    if (_rf69->recv(dataBuffer, &len)) {
-      if (!len) 
-        return false;
-      if (len != _byteCount)
-        return false;
-      dataBuffer[len] = 0;
-      for (int x = 0; x < _byteCount; x++)
-        _dataArray[x] = dataBuffer[x];
-    }
+  if (radio.available()) {
+      radio.read(_dataArray, _byteCount);
     return true;
   }
   return false;

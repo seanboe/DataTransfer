@@ -3,15 +3,16 @@
 
 #include <Arduino.h>
 #include <SPI.h>
-#include <RH_RF69.h>
+#include <nRF24L01.h>
+#include <RF24.h>
 
-#include "Config.h"
+#include "dataTransfer_Config.h"
 
 class Transfer {
   public:
-    Transfer(RH_RF69 *rf69, int byteCount, uint8_t * key);
+    Transfer(int CE, int CSN, int byteCount);
 
-    bool init();
+    bool init(uint8_t pipe, CommunicatorType communicatorType, const uint8_t* radioAddress);
 
     void write(BIT_OR_BYTE bitOrByte, int index, int value = 1);
     byte read(BIT_OR_BYTE bitOrByte, int index);  // true = bit, false = byte
@@ -22,12 +23,12 @@ class Transfer {
     uint8_t * _dataArray;  // buffer for all the data. This must be determined correctly; the first few bytes are for determining which sensors have data, and the bytes thereafter hold relevant data that require their own bytes. 
 
   private:
-    RH_RF69 * _rf69;
+    
+    RF24 radio;
 
     int _byteCount;
 
     // uint8_t * _dataArray;  // buffer for all the data. This must be determined correctly; the first few bytes are for determining which sensors have data, and the bytes thereafter hold relevant data that require their own bytes. 
-    uint8_t * _key; 
 
 };
 
